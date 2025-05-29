@@ -1,122 +1,103 @@
-Linux on HP Spectre x360 14-eu0xxx
-=====
-The latest and greatest Spectre x360 iteration offers new Core Ultra 155H with new ARC GPU which is at least twice as fast compared to the Xe graphics found in a few last generations, VPU for AI acceleration and many other cool features.
+# HP Spectre x360 14 (14-ef2xxx) — Linux Configuration (Ubuntu 24.04 Tested)
 
-But can it run Linux?
+This repository documents a working Linux setup for the **HP Spectre x360 14-ef2xxx**, tested with **Ubuntu 24.04.2 LTS** and **kernel 6.11 (mainline)**.  
+It includes device-specific workarounds—especially for **audio**—tailored to this model featuring a **13th Gen Intel i7-1355U** and **Realtek ALC245** codec.
 
-Hardware
---------
-Laptop is assembled by Quanta Computer, platform code name is DA0X3DMBAG0. If you happen to have boardview and/or schematic for the motherboard or know where to buy one please file an issue to contact me (please note that widely available DA0X3**A**MBAG0 schematics are for 2020 Spectre, not for this one).
+In this repository, I’ve adapted prior community findings and added new fixes specific to this hardware variant.
 
-You can find some photos of the motherboard in the [board][12] subfolder.
+---
 
-Should you buy it?
---------
-~~Linux won't boot without ACPI overlay and Secure Boot thus won't be usable until HP fixes the ACPI (probably never).~~
+## ✅ What Works
 
-~~Synaptics releases Linux-compatible firmware only if requested by the vendor so fingerprint reader won't work without HP say-so (none of previous generations got one working).~~ (Implemented in libfprint 1.94.9)
+- Display with full resolution and brightness control
+- Touchscreen and pen input
+- Wi-Fi and Bluetooth
+- Suspend/resume
+- Power management and thermals
+- **Audio (via manual SOF disable + legacy HDA driver fix)**
 
-Camera has two sensors connected to IPU6 via MIPI. Main sensor (ov08x40) has a linux driver but it's neither int3472-aware nor libcamera-compatible, IR sensor (og0va1b) doesn't have a driver at all. Neither of sensors is supported by Intel IPU6 stack (although it looks like support for ov08x40 may be coming), the same with libcamera (but this one can at least be patched) so it's unlikely either of this sensors will work without patching for at least another year.
+## 🔬 Research In Progress
 
-Otherwise it's a solid laptop, but think twice.
+- Webcam
+- Fingerprint reader (tested with `fprintd`, currently not functional)
 
-How to install with BIOS version F.10 or later?
---------
-HP have fixed the error in ACPI that caused panics so the installation is straightforward now. WiFi wakeup wasn't fixed however so SSDT patch or other workaround is still needed.
+---
 
-1. Run the installation as usual.
-2. Install IASL (usually package is named acpi-tools or acpica-tools or acpica).
-3. Download [SSDT patch][1] and compile it with `iasl -tc hp-spectre-x360-14-eu0xxx-f5a.asl`. There's a [separate patch version][16] for a 16-inch model.
-4. There's a number of ways to apply the resulting AML file. The easiest one is to put it to the `/boot` and add `acpi /boot/filename.aml` line to the grub config, you can do it manually via `e` for the first time and then switch to using some [helper scripts][2]. There're kernel [means][3], [manuals][9] and [helper scripts][4] of loading additional ACPI tables as well.
-5. Update your kernel to at least 6.7.
+## 🔊 Audio Fix for Realtek ALC245
 
-How to install with older BIOS versions?
---------
-If you're using Fedora see [Issue #4][13].
+### 🐛 The Problem
 
-1. Trackpad and touchscreen won't work during the setup so find a way to plug in both USB stick and a mouse at the same time if you need a mouse for the installation.
-2. Disable Secure Boot in the BIOS.
-3. Boot with `modprobe.blacklist=intel_lpss_pci` (press `e` in the grub menu, add parameter to the end of `linux` line, press `ctrl+x` to boot).
-4. Run the installation as usual.
-5. Add the same kernel parameter when rebooting to the installed system.
-6. Install IASL (usually package is named acpi-tools or acpica-tools or acpica).
-7. Download [SSDT patch][1] and compile it with `iasl -tc hp-spectre-x360-14-eu0xxx-f5a.asl`.
-8. There's a number of ways to apply the resulting AML file. The easiest one is to put it to the `/boot` and add `acpi /boot/filename.aml` line to the grub config, you can do it manually via `e` for the first time and then switch to using some [helper scripts][2]. There're kernel [means][3], [manuals][9] and [helper scripts][4] of loading additional ACPI tables as well.
-9. With SSDT patch applied you no longer need `modprobe.blacklist` workaround so previously disabled devices like trackpad and touchscreen should work at this point.
-10. Update your kernel to at least 6.7.
+By default, the system loads the **SOF (Sound Open Firmware)** driver stack with PipeWire. However:
 
-How to fix the sound?
---------
-1. Kernel:
-    * These fixes have been submitted and accepted so you don't have to patch if you're using kernel 6.9 or later.
-    * If you want to use 6.8 or older, you have to apply [these][5] [two][6] patches (`patch -p1 < filename.patch` in the kernel source directory) and rebuild the kernel, consult your distribution documentation on how to do it.
-2. If you have `Falling back to default firmware.` messages from `cs35l41-hda` in dmesg, your linux-firmware is outdated. You may either wait for your distribution to update the package or download the firmware from the [Cirrus repository][7] to /lib/firmware/cirrus manually. You will need following files:
-    * cs35l41-dsp1-spk-cali-103c8c15-spkid0-l0.bin
-    * cs35l41-dsp1-spk-cali-103c8c15-spkid0-r0.bin
-    * cs35l41-dsp1-spk-cali-103c8c15-spkid1-l0.bin
-    * cs35l41-dsp1-spk-cali-103c8c15-spkid1-r0.bin
-    * cs35l41-dsp1-spk-cali-103c8c15.wmfw symlink to cs35l41/v6.78.0/halo_cspl_RAM_revB2_29.80.0.wmfw
-    * cs35l41-dsp1-spk-prot-103c8c15-spkid0-l0.bin
-    * cs35l41-dsp1-spk-prot-103c8c15-spkid0-r0.bin
-    * cs35l41-dsp1-spk-prot-103c8c15-spkid1-l0.bin
-    * cs35l41-dsp1-spk-prot-103c8c15-spkid1-r0.bin
-    * cs35l41-dsp1-spk-prot-103c8c15.wmfw symlink to cs35l41/v6.78.0/halo_cspl_RAM_revB2_29.80.0.wmfw
-3. If you have mic mute LED constantly on, your linux-firmware is outdated. You may manually update `/lib/firmware/intel/sof-ace-tplg/sof-hda-generic-2ch.tplg` from the latest [sof-bin release][8].
-4. If micmute button doesn't work on the first boot of the kernel, it can sometimes be fixed by just rebooting once more (e.g. Manjaro). If it doesn't help (e.g. Ubuntu), try to run `echo -e "evdev:input:b0011v0001p0001eAB83*\n KEYBOARD_KEY_82=f20" | sudo tee /etc/udev/hwdb.d/90-internal-keyboard.hwdb > /dev/null && sudo systemd-hwdb update` and reboot.
+- No analog stereo or internal speaker output appears
+- `pavucontrol` shows no usable devices
+- `aplay -l` lists `sof-hda-dsp`, but it's unusable
 
-How to fix the camera?
---------
-This section is Proof-of-Concept for the time being, it might work for some use cases but it's doesn't result in a 100% functional camera. It's mostly here to show the camera will work at some point in future.
-1. Download patches
-```
-for i in {1..19}; do; wget -O "ipu6-$i.patch" "https://lore.kernel.org/linux-media/20240416201105.781496-$((i+1))-sakari.ailus@linux.intel.com/raw"; done
-wget -O int3472.patch https://lore.kernel.org/linux-media/20231007021225.9240-1-hao.yao@intel.com/raw
-wget https://raw.githubusercontent.com/aigilea/hp_spectre_x360_14_eu0xxx/main/ipu-bridge-69.patch
-wget https://raw.githubusercontent.com/aigilea/hp_spectre_x360_14_eu0xxx/main/ov08x40-69.patch
-```
-2. Apply patches in the order of download to the kernel 6.9 source tree, skip `ipu6-17.patch`.
-3. Ensure you have `CONFIG_VIDEO_OV08X40=m`, `CONFIG_INTEL_SKL_INT3472=m` and `CONFIG_VIDEO_INTEL_IPU6=m` in your kernel config file.
-4. Build & install the kernel.
-5. Ensure `/lib/firmware/intel/ipu/ipu6epmtl_fw.bin` file exists, update your `linux-firmware` package if not.
-6. Reboot and check your `dmesg` if `ipu6` has successfully initialized and found the `ov08x40` sensor.
-7. Build and install libcamera
-    * `git clone https://gitlab.freedesktop.org/camera/libcamera-softisp.git`
-    * `cd libcamera-softisp`
-    * `git checkout SoftwareISP-v10`
-    * `wget https://raw.githubusercontent.com/aigilea/hp_spectre_x360_14_eu0xxx/main/libcamera.patch`
-    * `patch -p1 < ./libcamera.patch`
-    * `meson setup -Dpipelines=simple -Dipas=simple --prefix=/usr build`
-    * `ninja -C build install`
-8. Now you should be able to view the camera by launching `sudo qcam -s "width=1928,height=1208"`. You may safely ignore missing `ov08x40.yaml` file error.
-9. To allow other apps to use camera you have to make pipewire to use the new libcamera, this step depends on your distribution. You can test using [webrtc test page][11] in Firefox.
+### ✅ The Solution: Disable SOF and Force Legacy HDA Driver
 
-Don't disable keyboard and trackpad when tilted
---------
-See [Issue #5][14].
+1. Edit/create the modprobe config file:
 
-Enable trackpad palm rejection
---------
-The spectre has a very nice touchpad, but Linux doesn't set the correct quirks to enable the hardware palm rejection. You can install the [palm-rejection](palm-rejection.service) systemd service to automatically set the quirks until the hid-multitouch kernel module is updated.
-
-```sh
-sudo cp palm-rejection.service /etc/systemd/system
-sudo systemctl enable palm-rejection.service
-sudo systemctl start palm-rejection.service
+```bash
+sudo nano /etc/modprobe.d/alsa-base.conf
 ```
 
-[1]: https://raw.githubusercontent.com/aigilea/hp_spectre_x360_14_eu0xxx/main/hp-spectre-x360-14-eu0xxx-f5a.asl
-[2]: https://github.com/thor2002ro/asus_zenbook_ux3402za/tree/main/Sound
-[3]: https://docs.kernel.org/admin-guide/acpi/ssdt-overlays.html
-[4]: https://github.com/thesofproject/acpi-scripts
-[5]: https://raw.githubusercontent.com/aigilea/hp_spectre_x360_14_eu0xxx/main/kernel-cs35l41.patch
-[6]: https://raw.githubusercontent.com/aigilea/hp_spectre_x360_14_eu0xxx/main/kernel-realtek.patch
-[7]: https://github.com/CirrusLogic/linux-firmware/tree/main/cirrus
-[8]: https://github.com/thesofproject/sof-bin/releases
-[9]: https://gist.github.com/lamperez/d5b385bc0c0c04928211e297a69f32d7
-[10]: https://raw.githubusercontent.com/aigilea/hp_spectre_x360_14_eu0xxx/main/kernel-realtek-69.patch
-[11]: https://mozilla.github.io/webrtc-landing/gum_test.html
-[12]: https://github.com/aigilea/hp_spectre_x360_14_eu0xxx/tree/master/board
-[13]: https://github.com/aigilea/hp_spectre_x360_14_eu0xxx/issues/4
-[14]: https://github.com/aigilea/hp_spectre_x360_14_eu0xxx/issues/5
-[15]: https://github.com/aigilea/hp_spectre_x360_14_eu0xxx/issues/6
-[16]: https://raw.githubusercontent.com/aigilea/hp_spectre_x360_14_eu0xxx/main/hp-spectre-x360-16-aa0xxx-f10.asl
+2. Add this line to disable SOF and enable the legacy HDA driver:
+
+```bash
+options snd-intel-dspcfg dsp_driver=1
+```
+
+3. Regenerate initramfs and reboot:
+
+```bash
+sudo update-initramfs -u
+sudo reboot
+```
+
+4. After reboot, verify with:
+
+```bash
+aplay -l
+```
+
+You should see something like:
+
+```
+card 0: PCH [HDA Intel PCH], device 0: ALC245 Analog
+```
+
+🎉 Internal speakers should now work correctly.
+
+---
+
+## 🧰 System Specs
+
+- **Model**: HP Spectre x360 14-ef2xxx
+- **CPU**: Intel i7-1355U (13th Gen)
+- **Audio Codec**: Realtek ALC245
+- **Graphics**: Intel Iris Xe
+- **Display**: 13.5" 3:2 OLED Touch
+- **OS**: Ubuntu 24.04.2 LTS
+- **Kernel**: 6.11 (mainline)
+
+---
+
+## 🛠 Tips
+
+- PipeWire + WirePlumber works fine after the SOF override
+- Use `power-profiles-daemon` or `TLP` for better battery life
+- Consider disabling Secure Boot for kernel module overrides
+
+---
+
+## 📎 Sources & References
+
+- [My LinkedIn post documenting the fix](https://www.linkedin.com/posts/egarciaga_how-i-fixed-audio-on-my-hp-spectre-x360-running-activity-7320823718207782940-o8hd)
+- [SOF documentation](https://www.sofproject.org/)
+- [Ubuntu PipeWire wiki](https://wiki.ubuntu.com/Audio/PipeWire)
+
+---
+
+## 🙏 Acknowledgments
+
+Thanks to the Linux and open-source community. If you're using this config or hit issues, feel free to open an issue or connect via LinkedIn. Contributions welcome!
